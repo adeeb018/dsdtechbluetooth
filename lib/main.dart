@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:developer';
 
+import 'package:dsdbluetooth/ble_device_list.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'dart:io';
 
+import 'bluetooth_connection.dart';
 import 'control_page.dart';
 
 void main() {
@@ -30,23 +32,9 @@ class BluetoothScreenState extends State<BluetoothScreen> {
   bool _isButtonDisabled = false;
   static ScanResult? deviceToConnect;
 
-  @override
-  void initState() {
-    var subscription = FlutterBluePlus.onScanResults.listen((results) {
-      if (results.isNotEmpty) {
-        log("BLE APP result is there");
-        ScanResult r = results.last; // the most recently found device
-        if (r.advertisementData.advName == "DSD TECH") {
-          deviceToConnect = r;
-        }
-        print('${r.device.remoteId}: "${r.advertisementData.advName}" found!');
-      }
-    },
-      onError: (e) => print(e),
-    );
-    // usually start scanning, connecting, etc
-    super.initState();
-  }
+  late Set<DeviceList> devices;
+
+  BluetoothScreen1 bluetoothScreen = BluetoothScreen1();
 
   @override
   Widget build(BuildContext context) {
@@ -59,19 +47,31 @@ class BluetoothScreenState extends State<BluetoothScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             ElevatedButton(
-              onPressed: () {
-                scan();
+              onPressed: () async {
+                devices = await bluetoothScreen.scan();
+                devices.forEach((element) {
+                  log('${element.macId} and ${element.advertisementName}');
+                });
                 // await scanAndPrintDevices();
                 // print(_scanResults);
               },
               child: Text('Scan for Devices'),
             ),
             ElevatedButton(
-                onPressed: (){
-                  _isButtonDisabled?connect():showSnackBar(context, 'device not found on scan, scan again and wait for 5 seconds');
+                onPressed: () async {
+                  String? macId;
+                  for (var element in devices) {
+                    if(element.advertisementName == 'DSD TECH'){
+                      macId = element.macId;
+                    }
+                  }
+                  await bluetoothScreen.connect(autoConnect: false,deviceMac: macId);
                 }, child: Text('Connect to device')),
             ElevatedButton(
-                onPressed: disconnect, child: Text('Disconnect to device')),
+                onPressed: (){
+                  bluetoothScreen.disconnect();
+                  },
+                child: Text('Disconnect to device')),
           ],
         ),
       ),
